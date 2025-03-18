@@ -22,12 +22,14 @@ def prepare_data_attackers(players_dataframe): # forwards and midfielders togeth
     target = 'total_points' # value we are predicting
 
     # filter forwards dataframe to only include selected columns, drop rows w missing values
-    filtered_dataframe = attackers_dataframe[features + [target]].dropna()
+    # added web name as well
+    filtered_dataframe = attackers_dataframe[features + [target, 'web_name']].dropna()
 
     X = filtered_dataframe[features]
     y = filtered_dataframe[target]
+    web_names = filtered_dataframe['web_name']
 
-    return X, y
+    return X, y, web_names
 
 
 
@@ -41,9 +43,7 @@ def train_and_evaluate_model(X, y):
     predictions = model.predict(X_test) # Make predictions on test set
 
     mae = mean_absolute_error(y_test, predictions) # Average absolute difference between predictions and actual values
-
     rmse = numpy.sqrt(mean_squared_error(y_test, predictions)) # Square root of the average squared differences (RMSE)
-
     r2 = r2_score(y_test, predictions) # Proportion of the variance in the target that's explained by the features
 
 
@@ -53,7 +53,7 @@ def train_and_evaluate_model(X, y):
     print("Root Mean Squared Error (RMSE):", rmse)
     print("R² Score:", r2)
 
-    return model
+    return model, X_test, y_test, predictions, mae, rmse, r2
 
 if __name__ == '__main__':
 
@@ -62,7 +62,7 @@ if __name__ == '__main__':
     print("Data loaded, shape:", players_dataframe.shape)
 
     # Prepare the data for attackers (forwards and midfielders)
-    X, y = prepare_data_attackers(players_dataframe)
+    X, y, _ = prepare_data_attackers(players_dataframe)
     print("Prepared data: features shape =", X.shape, "target shape =", y.shape)
 
     # Train the model and evaluate its performance

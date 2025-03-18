@@ -1,20 +1,20 @@
+import numpy
 import streamlit
 import sqlite3
 import pandas
 import matplotlib.pyplot as matplot
 import seaborn
+from sklearn.metrics import mean_absolute_error
 
-def load_data(database="fpl_new_data.db", table="fpl_players"):
-    sqlConn = sqlite3.connect(database)
-    players_dataframe = pandas.read_sql_query(f"SELECT * FROM {table}", sqlConn)
-    sqlConn.close()
-    return players_dataframe
+from predictive_model import load_data, prepare_data_attackers, train_and_evaluate_model
 
 
 def main():
     streamlit.title("FPL Dashboard") # Main title of dashboard
+    streamlit.write("The following data is specifically for Fantasy Premier League Forwards and Midfielders")
 
-    players_dataframe = load_data() # Load FPL data from the database
+    players_dataframe = load_data(database="fpl_new_data.db", table="fpl_players") # Load FPL data from the database
+
     streamlit.subheader("Top Points Scorers")
     sorted_preview = players_dataframe.sort_values(by='total_points', ascending=False)[['web_name', 'total_points', 'goals_scored', 'assists']]
     streamlit.dataframe(sorted_preview.head(80))
@@ -55,32 +55,58 @@ def main():
     streamlit.pyplot(fig3)
 
 
+    #
+    # Predictive Model Integration
+    #
+    streamlit.divider()
+
+    streamlit.subheader("Predictive Model: Actual vs Predicted Total Points")
+    streamlit.write("The following section contains predictive data from a Random Forest Regression machine learning model")
+
+    # Prepare data for attackers (forwards and midfielders) using imported function
+    X, y, web_names = prepare_data_attackers(players_dataframe)
+
+    # Train the model and evaluate its performance using imported function
+    model, X_test, y_test, predictions, mae, rmse, r2 = train_and_evaluate_model(X, y)
+
+    mae = round(mae, 3)
+    rmse = round(rmse, 3)
+    r2 = round(r2, 3)
+
+
+    streamlit.subheader("Model Evaluation Metrics")
+    col1, col2, col3 = streamlit.columns(3)
+    col1.metric(label="MAE", value=mae)
+    col2.metric(label="RMSE", value=rmse)
+    col3.metric(label="R² Score", value=r2)
+
+
+    # Create a dataframe to compare actual vs predicted total points from the test set
+    results_dataframe = pandas.DataFrame({
+        'web_name': web_names.loc[X_test.index],
+        'Actual Total Points': y_test,
+        'Predicted Total Points': predictions
+    })
+
+    results_dataframe = results_dataframe.sort_values(by='Actual Total Points', ascending=False)
+
+    streamlit.subheader("Actual vs Predicted Total Points (Test Set)")
+    streamlit.dataframe(results_dataframe.head(50))
+
+    # Visualization 4: Scatter Plot for Actual vs Predicted Total Points
+    streamlit.subheader("Scatter Plot: Actual vs Predicted Total Points")
+    fig4, axis4 = matplot.subplots(figsize=(8,6))
+    seaborn.scatterplot(data=results_dataframe, x='Actual Total Points', y='Predicted Total Points', ax=axis4)
+    axis4.set_xlabel("Actual Total Points")
+    axis4.set_ylabel("Predicted Total Points")
+    axis4.set_title("Actual vs Predicted Total Points")
+    streamlit.pyplot(fig4)
+
+
+
+
 if __name__ == '__main__':
     main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
