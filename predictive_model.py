@@ -13,7 +13,7 @@ def train_and_evaluate_model(training_data):
                 'opponent_team', 'was_home']
     target = 'total_points'
 
-    # Filter the DataFrame to include only selected columns and drop rows with missing target values
+    # Filter the dataframe to include only selected columns and drop rows with missing values
     filtered_df = training_data[features + [target, 'name', 'season']].dropna(subset=[target])
 
     # Convert categorical features (opponent_team and was_home) to numerical
@@ -28,7 +28,7 @@ def train_and_evaluate_model(training_data):
     # Split the data into training and testing sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=1)
 
-    # Create and train the Random Forest Regressor
+    # Create and train the random forest regression model
     model = RandomForestRegressor(n_estimators=100, random_state=1)
     model.fit(X_train, y_train)
 
@@ -44,7 +44,7 @@ def train_and_evaluate_model(training_data):
     rmse = np.sqrt(mean_squared_error(y_test, predictions))
     r2 = r2_score(y_test, predictions)
 
-    # Print evaluation metrics
+    # Print the evaluation metrics
     print("Model Evaluation:")
     print("Mean Absolute Error (MAE):", mae)
     print("Root Mean Squared Error (RMSE):", rmse)
@@ -54,7 +54,7 @@ def train_and_evaluate_model(training_data):
 
 
 def predict_next_gameweek_points(model, player_data, feature_names, teams):
-    # Predict next gameweek points for a specific player using their historical data.
+    # Predict next gameweek points for a specific player using their historical data
 
     # Features used in the model
     features = ['minutes', 'goals_scored', 'assists', 'expected_goals',
@@ -65,7 +65,7 @@ def predict_next_gameweek_points(model, player_data, feature_names, teams):
     # Filter the player data to include only the relevant features
     player_data_filtered = player_data[features].dropna()
 
-    # Convert categorical features (opponent_team and was_home) to numerical
+    # Convert any categorical features (opponent_team and was_home) to numerical
     player_data_filtered['was_home'] = player_data_filtered['was_home'].astype(int)
     player_data_filtered = pd.get_dummies(player_data_filtered, columns=['opponent_team'], drop_first=True)
 
@@ -74,7 +74,7 @@ def predict_next_gameweek_points(model, player_data, feature_names, teams):
         if col not in player_data_filtered.columns:
             player_data_filtered[col] = 0  # Add missing columns with a value of 0
 
-    # Reorder columns to match the training data
+    # Reorder the columns to match the training data
     player_data_filtered = player_data_filtered[feature_names]
 
     # Predict the points
