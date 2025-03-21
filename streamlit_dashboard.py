@@ -6,7 +6,7 @@ from predictive_model import train_and_evaluate_model, predict_next_gameweek_poi
 from data_pipeline import load_all_data
 
 def main():
-    st.title("FPL Dashboard")
+    st.title("Fantasy Premier League Dashboard")
     st.write("The following data is for FPL Managers looking to gain an edge")
 
     # Load the data
@@ -21,7 +21,7 @@ def main():
 
     # Points Predictor section
     st.divider()
-    st.subheader("Predict Next Gameweek Points for a Player")
+    st.subheader("Next Gameweek Points Predictor")
 
     # Dropdown menu to select a player
     selected_player = st.selectbox("Select a Player", player_names.unique())
@@ -39,15 +39,15 @@ def main():
                 st.subheader(f"Predicted Next Gameweek Points for {selected_player}")
                 st.write(f"Predicted Points for Next Gameweek: **{predicted_points:.2f}**")
             else:
-                st.error("Insufficient data to make a prediction for this player.")
+                st.error("Insufficient data to make a prediction for this player")
         else:
-            st.error("Player not found in the database.")
+            st.error("Player not found in the database")
 
     # Table of Players with most predicted points for next gw
     st.divider()
-    st.subheader("Players with Most Predicted Points for Next Gameweek")
+    st.subheader("Players with the Highest Predicted Points Total for Next Gameweek")
 
-    if st.button("Generate Predictions for Top 20"):
+    if st.button("Generate Predictions (Top 20)"):
         # Create a list to store the predictions
         predictions_list = []
 
