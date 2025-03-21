@@ -1,51 +1,48 @@
-import sqlite3
-import pandas
-import numpy
+import pandas as pd
+import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-def load_data(database="fpl_new_data.db", table="fpl_players"):
-    sqlConn = sqlite3.connect(database)
-    players_dataframe = pandas.read_sql_query(f"SELECT * FROM {table}", sqlConn)
-    sqlConn.close()
-    return players_dataframe
 
-def prepare_data_attackers(players_dataframe): # forwards and midfielders together as they both earn their points through goals and assists
-    attackers_dataframe = players_dataframe[players_dataframe['element_type'].isin([3,4])] # mids = 3, fwds = 4
+def train_and_evaluate_model(training_data):
+    # Prepare the data
+    features = ['minutes', 'goals_scored', 'assists', 'expected_goals',
+                'expected_assists', 'expected_goal_involvements', 'bonus', 'bps',
+                'clean_sheets', 'saves', 'penalties_saved', 'yellow_cards', 'red_cards',
+                'opponent_team', 'was_home']
+    target = 'total_points'
 
-    # features relevant for attacker points
-    features = ['minutes', 'goals_scored', 'assists','points_per_game', 'yellow_cards','bonus', 'bps',
-                'expected_goals', 'expected_assists','expected_goal_involvements'
-                ]
+    # Filter the DataFrame to include only selected columns and drop rows with missing target values
+    filtered_df = training_data[features + [target, 'name', 'season']].dropna(subset=[target])
 
-    target = 'total_points' # value we are predicting
+    # Convert categorical features (opponent_team and was_home) to numerical
+    filtered_df['was_home'] = filtered_df['was_home'].astype(int)
+    filtered_df = pd.get_dummies(filtered_df, columns=['opponent_team'], drop_first=True)
 
-    # filter forwards dataframe to only include selected columns, drop rows w missing values
-    # added web name as well
-    filtered_dataframe = attackers_dataframe[features + [target, 'web_name']].dropna()
+    # Separate features, target, and player names
+    X = filtered_df.drop(columns=[target, 'name', 'season'])
+    y = filtered_df[target]
+    player_names = filtered_df['name']
 
-    X = filtered_dataframe[features]
-    y = filtered_dataframe[target]
-    web_names = filtered_dataframe['web_name']
+    # Split the data into training and testing sets
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=1)
 
-    return X, y, web_names
-
-
-
-def train_and_evaluate_model(X, y):
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=1) # split data in training and testing sets (80% train, 20% test)
-
-    # Create and train random forest regressor with 100 trees
+    # Create and train the Random Forest Regressor
     model = RandomForestRegressor(n_estimators=100, random_state=1)
     model.fit(X_train, y_train)
 
-    predictions = model.predict(X_test) # Make predictions on test set
+    # Save the feature names and the full list of teams
+    feature_names = X_train.columns.tolist()
+    teams = [col for col in feature_names if col.startswith('opponent_team_')]
 
-    mae = mean_absolute_error(y_test, predictions) # Average absolute difference between predictions and actual values
-    rmse = numpy.sqrt(mean_squared_error(y_test, predictions)) # Square root of the average squared differences (RMSE)
-    r2 = r2_score(y_test, predictions) # Proportion of the variance in the target that's explained by the features
+    # Make predictions on the test set
+    predictions = model.predict(X_test)
 
+    # Calculate evaluation metrics
+    mae = mean_absolute_error(y_test, predictions)
+    rmse = np.sqrt(mean_squared_error(y_test, predictions))
+    r2 = r2_score(y_test, predictions)
 
     # Print evaluation metrics
     print("Model Evaluation:")
@@ -53,17 +50,36 @@ def train_and_evaluate_model(X, y):
     print("Root Mean Squared Error (RMSE):", rmse)
     print("R² Score:", r2)
 
-    return model, X_test, y_test, predictions, mae, rmse, r2
+    return model, X_test, y_test, predictions, mae, rmse, r2, feature_names, teams, player_names
 
-if __name__ == '__main__':
 
-    # load the data from SQLite
-    players_dataframe = load_data()
-    print("Data loaded, shape:", players_dataframe.shape)
+def predict_next_gameweek_points(model, player_data, feature_names, teams):
+    # Predict next gameweek points for a specific player using their historical data.
 
-    # Prepare the data for attackers (forwards and midfielders)
-    X, y, _ = prepare_data_attackers(players_dataframe)
-    print("Prepared data: features shape =", X.shape, "target shape =", y.shape)
+    # Features used in the model
+    features = ['minutes', 'goals_scored', 'assists', 'expected_goals',
+                'expected_assists', 'expected_goal_involvements', 'bonus', 'bps',
+                'clean_sheets', 'saves', 'penalties_saved', 'yellow_cards', 'red_cards',
+                'opponent_team', 'was_home']
 
-    # Train the model and evaluate its performance
-    model = train_and_evaluate_model(X, y)
+    # Filter the player data to include only the relevant features
+    player_data_filtered = player_data[features].dropna()
+
+    # Convert categorical features (opponent_team and was_home) to numerical
+    player_data_filtered['was_home'] = player_data_filtered['was_home'].astype(int)
+    player_data_filtered = pd.get_dummies(player_data_filtered, columns=['opponent_team'], drop_first=True)
+
+    # Ensure the prediction data has the same columns as the training data
+    for col in feature_names:
+        if col not in player_data_filtered.columns:
+            player_data_filtered[col] = 0  # Add missing columns with a value of 0
+
+    # Reorder columns to match the training data
+    player_data_filtered = player_data_filtered[feature_names]
+
+    # Predict the points
+    if not player_data_filtered.empty:
+        predicted_points = model.predict(player_data_filtered)
+        return np.mean(predicted_points)  # Return the average prediction
+    else:
+        return None  # Return None if no data is available

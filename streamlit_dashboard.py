@@ -1,112 +1,113 @@
-import numpy
-import streamlit
-import sqlite3
-import pandas
-import matplotlib.pyplot as matplot
-import seaborn
-from sklearn.metrics import mean_absolute_error
-
-from predictive_model import load_data, prepare_data_attackers, train_and_evaluate_model
-
+import streamlit as st
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from predictive_model import train_and_evaluate_model, predict_next_gameweek_points
+from data_pipeline import load_all_data
 
 def main():
-    streamlit.title("FPL Dashboard") # Main title of dashboard
-    streamlit.write("The following data is specifically for Fantasy Premier League Forwards and Midfielders")
+    st.title("FPL Dashboard")
+    st.write("The following data is specifically for Fantasy Premier League players.")
 
-    players_dataframe = load_data(database="fpl_new_data.db", table="fpl_players") # Load FPL data from the database
+    # Load the data
+    data = load_all_data()
 
-    streamlit.subheader("Top Points Scorers")
-    sorted_preview = players_dataframe.sort_values(by='total_points', ascending=False)[['web_name', 'total_points', 'goals_scored', 'assists']]
-    streamlit.dataframe(sorted_preview.head(80))
+    # Filter data for the 2023-24 season (training) and 2024-25 season (predictions)
+    training_data = data[data['season'] == '2023-24']
+    prediction_data = data[data['season'] == '2024-25']
 
+    # Train the model and get feature names, teams, and player names
+    model, X_test, y_test, predictions, mae, rmse, r2, feature_names, teams, player_names = train_and_evaluate_model(training_data)
 
-    # Visualization 1 - Histogram of Total Points
-    streamlit.subheader("Distribution of Total Points") # label the section
-    fig1, axis1 = matplot.subplots(figsize=(8,6)) # create new figure
-    seaborn.histplot(players_dataframe['total_points'].dropna(), bins=20, kde=True, ax=axis1) # create Histogram of total_points column
-    axis1.set_xlabel("Total Points")
-    axis1.set_ylabel("Frequency")
-    axis1.set_title("Total Points Distribution")
-    streamlit.pyplot(fig1) # Create the figure in the Streamlit app
+    # Points Predictor Section
+    st.divider()
+    st.subheader("Predict Next Gameweek Points for a Player")
 
+    # Dropdown to select a player
+    selected_player = st.selectbox("Select a Player", player_names.unique())
 
-    # Visualization 2 - Scatter Plot - Goals Scored Vs. Total Points
-    streamlit.subheader("Goals Scored vs Total Points")
-    fig2, axis2 = matplot.subplots(figsize=(8,6))
-    seaborn.scatterplot(data=players_dataframe, x='goals_scored', y='total_points', ax=axis2)
-    axis2.set_xlabel("Goals Scored")
-    axis2.set_ylabel("Total Points")
-    axis2.set_title("Scatter Plot: Goals Scored vs Total Points")
-    streamlit.pyplot(fig2)
+    # Button to trigger prediction
+    if st.button("Predict Next Gameweek Points"):
+        # Filter the player's historical data from the 2024-25 season
+        player_data = prediction_data[prediction_data['name'] == selected_player]
 
-    # Convert xGI(float) and total points to numeric
-    players_dataframe['expected_goal_involvements'] = pandas.to_numeric(
-        players_dataframe['expected_goal_involvements'], errors="coerce")
-    players_dataframe['total_points'] = pandas.to_numeric(
-        players_dataframe['total_points'], errors="coerce")
+        if not player_data.empty:
+            # Predict next gameweek points for the selected player
+            predicted_points = predict_next_gameweek_points(model, player_data, feature_names, teams)
 
-    # Visualization 3 - Regression Plot (Regplot) - Expected Goal Involvements vs Total Points
-    streamlit.subheader("Correlation: Expected Goal Involvements vs Total Points")
-    fig3, axis3 = matplot.subplots(figsize=(8,6))
-    seaborn.regplot(data=players_dataframe, x='expected_goal_involvements', y='total_points', ax=axis3)
-    axis3.set_xlabel("Expected Goal Involvements(xGI)")
-    axis3.set_ylabel("Total Points")
-    axis3.set_title("Expected Goal Involvements(xGI) vs Total Points")
-    streamlit.pyplot(fig3)
+            if predicted_points is not None:
+                st.subheader(f"Predicted Next Gameweek Points for {selected_player}")
+                st.write(f"Predicted Points for Next Gameweek: **{predicted_points:.2f}**")
+            else:
+                st.error("Insufficient data to make a prediction for this player.")
+        else:
+            st.error("Player not found in the database.")
 
+    # Table of Players with Most Predicted Points
+    st.divider()
+    st.subheader("Players with Most Predicted Points for Next Gameweek")
 
-    #
-    # Predictive Model Integration
-    #
-    streamlit.divider()
+    if st.button("Generate Predictions for Top 20"):
+        # Create a list to store predictions
+        predictions_list = []
 
-    streamlit.subheader("Predictive Model: Actual vs Predicted Total Points")
-    streamlit.write("The following section contains predictive data from a Random Forest Regression machine learning model")
+        # Loop through all players in the 2024-25 season data
+        for player in player_names.unique():
+            player_data = prediction_data[prediction_data['name'] == player]
+            if not player_data.empty:
+                predicted_points = predict_next_gameweek_points(model, player_data, feature_names, teams)
+                if predicted_points is not None:
+                    predictions_list.append({
+                        'name': player,
+                        'predicted_points': predicted_points
+                    })
 
-    # Prepare data for attackers (forwards and midfielders) using imported function
-    X, y, web_names = prepare_data_attackers(players_dataframe)
+        # Convert the list to a DataFrame
+        predictions_df = pd.DataFrame(predictions_list)
 
-    # Train the model and evaluate its performance using imported function
-    model, X_test, y_test, predictions, mae, rmse, r2 = train_and_evaluate_model(X, y)
+        # Sort the DataFrame by predicted points in descending order
+        predictions_df = predictions_df.sort_values(by='predicted_points', ascending=False)
 
-    mae = round(mae, 3)
-    rmse = round(rmse, 3)
-    r2 = round(r2, 3)
+        # Display the table
+        st.dataframe(predictions_df.head(20))  # Show top 20 players
 
+    # Visualizations Section
+    st.divider()
+    st.subheader("Visualizations (2023-24 Season)")
 
-    streamlit.subheader("Model Evaluation Metrics")
-    col1, col2, col3 = streamlit.columns(3)
-    col1.metric(label="MAE", value=mae)
-    col2.metric(label="RMSE", value=rmse)
-    col3.metric(label="R² Score", value=r2)
-
-
-    # Create a dataframe to compare actual vs predicted total points from the test set
-    results_dataframe = pandas.DataFrame({
-        'web_name': web_names.loc[X_test.index],
-        'Actual Total Points': y_test,
-        'Predicted Total Points': predictions
-    })
-
-    results_dataframe = results_dataframe.sort_values(by='Actual Total Points', ascending=False)
-
-    streamlit.subheader("Actual vs Predicted Total Points (Test Set)")
-    streamlit.dataframe(results_dataframe.head(50))
-
-    # Visualization 4: Scatter Plot for Actual vs Predicted Total Points
-    streamlit.subheader("Scatter Plot: Actual vs Predicted Total Points")
-    fig4, axis4 = matplot.subplots(figsize=(8,6))
-    seaborn.scatterplot(data=results_dataframe, x='Actual Total Points', y='Predicted Total Points', ax=axis4)
-    axis4.set_xlabel("Actual Total Points")
-    axis4.set_ylabel("Predicted Total Points")
-    axis4.set_title("Actual vs Predicted Total Points")
-    streamlit.pyplot(fig4)
+    # Display top points scorers
+    st.subheader("Top Points Scorers (2023-24 Season)")
+    top_scorers = training_data.groupby('name')['total_points'].sum().reset_index().sort_values(by='total_points', ascending=False)
+    st.dataframe(top_scorers.head(20))
 
 
 
+
+
+
+    st.subheader("Goals Scored vs Total Points (2023-24 Season)")
+    fig2, ax2 = plt.subplots(figsize=(8, 6))
+    sns.scatterplot(data=training_data, x='goals_scored', y='total_points', ax=ax2)
+    ax2.set_xlabel("Goals Scored")
+    ax2.set_ylabel("Total Points")
+    ax2.set_title("Goals Scored vs Total Points (2023-24 Season)")
+    st.pyplot(fig2)
+
+    # Visualization 3: Expected Goal Involvements (xGI) vs Total Points
+    st.subheader("Expected Goal Involvements (xGI) vs Total Points (2023-24 Season)")
+    fig3, ax3 = plt.subplots(figsize=(8, 6))
+    sns.regplot(data=training_data, x='expected_goal_involvements', y='total_points', ax=ax3)
+    ax3.set_xlabel("Expected Goal Involvements (xGI)")
+    ax3.set_ylabel("Total Points")
+    ax3.set_title("Expected Goal Involvements (xGI) vs Total Points (2023-24 Season)")
+    st.pyplot(fig3)
 
 if __name__ == '__main__':
     main()
+
+
+
 
 
 

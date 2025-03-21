@@ -1,28 +1,26 @@
 import sqlite3
 import matplotlib
-import matplotlib.pyplot as matplot
-import seaborn
-import pandas
-
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+from data_pipeline import load_all_data
+'''
 def load_data(database="fpl_new_data.db", table="fpl_players"):
     sqlConn = sqlite3.connect(database) # create connection to SQLite database
     players_dataframe = pandas.read_sql_query(f"SELECT * FROM {table}", sqlConn)
     sqlConn.close()
     return players_dataframe
+'''
+
+def main():
+    # Load the data
+    data = load_all_data()
+
+    # Filter data for the 2023-24 season
+    season_data = data[data['season'] == '2023-24']
+
+
+
 
 if __name__ == '__main__':
-    players_dataframe = load_data() # load the data from the database
-
-    matplot.figure(figsize=(8,6))
-    seaborn.histplot(data=players_dataframe['total_points'].dropna(), bins=20, kde=True) # histogram for player points, dropna() in case of missing values
-    matplot.xlabel("Total Points")
-    matplot.ylabel("Frequency")
-    matplot.title("Total Points Distribution")
-    matplot.show()
-
-    # print statements for understanding the data structure and debugging
-    print("Total players:", players_dataframe.shape[0])
-    print("Dataset Shape:", players_dataframe.shape)
-    print("Columns:", players_dataframe.columns.tolist())
-    print("\nFirst 5 Rows:")
-    print(players_dataframe.head())
+    main()
