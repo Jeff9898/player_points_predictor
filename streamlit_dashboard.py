@@ -8,7 +8,7 @@ from data_pipeline import load_all_data
 
 def main():
     st.title("Fantasy Premier League Dashboard")
-    st.write("This tool uses up-to-date player performance data to generate accurate point predictions and help FPL managers make smarter decisions each gameweek of the 2024-25 season")
+    st.write("This prediction tool uses up-to-date player performance data to generate accurate point predictions and help FPL managers make smarter decisions each gameweek of the 2024-25 season")
 
     # Load the data
     data = load_all_data()
@@ -22,10 +22,11 @@ def main():
 
     # Points Predictor section
     st.divider()
-    st.subheader("Next Gameweek Points Predictor")
+    st.subheader("Upcoming Gameweek Player Points Predictor")
 
-    # Dropdown menu to select a player
-    selected_player = st.selectbox("Select a Player", player_names.unique())
+    # Only show players from the current season (2024-25) in the dropdown
+    available_players = prediction_data['name'].unique()
+    selected_player = st.selectbox("Select a Player", available_players)
 
     # Button to trigger the prediction
     if st.button("Predict Next Gameweek Points"):
@@ -42,11 +43,11 @@ def main():
             else:
                 st.error("Insufficient data to make a prediction for this player")
         else:
-            st.error("Player not found in the database")
+            st.error("Selected player not available - This player is no longer in the Premier League")
 
     # Table of Players with most predicted points for next gw
     st.divider()
-    st.subheader("Players with the Highest Predicted Points Total for Next Gameweek")
+    st.subheader("Predicted Top Picks for Next Gameweek")
 
     if st.button("Generate Predictions (Top 20)"):
         # Create a list to store the predictions
@@ -94,7 +95,7 @@ def main():
     st.subheader("Expected Goals vs Actual Goals Scored")
     fig1, ax1 = plt.subplots(figsize=(8, 6))
     sns.scatterplot(data=season_totals, x='expected_goals', y='goals_scored', hue='position', ax=ax1)
-    ax1.set_title('Expected Goals vs Actual Goals Scored (Season Totals)')
+    ax1.set_title('Expected Goals vs Actual Goals Scored (2023-24 Season Totals)')
     ax1.set_xlabel('Expected Goals (Season)')
     ax1.set_ylabel('Actual Goals Scored (Season)')
     ax1.legend(title='Position')
@@ -110,14 +111,13 @@ def main():
     ax2.set_ylabel('Player')
     st.pyplot(fig2)
 
-    # Visualization 3: Minutes Played vs Total Points (Season Totals)
-    st.subheader("Minutes Played vs Total Points")
+    # Visualization 3: Points Distribution by Position
+    st.subheader("Points Distribution by Position")
     fig3, ax3 = plt.subplots(figsize=(8, 6))
-    sns.scatterplot(data=season_totals, x='minutes', y='total_points', hue='position', ax=ax3)
-    ax3.set_title('Minutes Played vs Total Points (Season Totals)')
-    ax3.set_xlabel('Minutes Played (Season)')
+    sns.boxplot(data=season_totals, x='position', y='total_points', palette='viridis')
+    ax3.set_title('FPL Points Distribution by Position (2023-24 Season)')
+    ax3.set_xlabel('Player Position')
     ax3.set_ylabel('Total Points (Season)')
-    ax3.legend(title='Position')
     st.pyplot(fig3)
 
 
