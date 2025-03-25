@@ -2,12 +2,13 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+
 from predictive_model import train_and_evaluate_model, predict_next_gameweek_points
 from data_pipeline import load_all_data
 
 def main():
     st.title("Fantasy Premier League Dashboard")
-    st.write("The following data is for FPL Managers looking to gain an edge")
+    st.write("This tool uses up-to-date player performance data to generate accurate point predictions and help FPL managers make smarter decisions each gameweek of the 2024-25 season")
 
     # Load the data
     data = load_all_data()
@@ -73,57 +74,52 @@ def main():
 
     # Visualizations Section
     st.divider()
+    st.divider()
     st.subheader("Visualizations (2023-24 Season)")
-
-    # Display top points scorers
-    st.subheader("Top Points Scorers (2023-24 Season)")
-    top_scorers = training_data.groupby('name')['total_points'].sum().reset_index().sort_values(by='total_points', ascending=False)
-    st.dataframe(top_scorers.head(20))
-
-
+    st.write("The following visuals are based on historical data from the 2023-24 Premier League season")
 
 #  ------- Visualizations --------
 
-# Aggregate 2023-24 season data
-# Group each player by 'name', and sum the values for each parameter
+    # Group by player and sum season totals for certain metrics
+    season_totals = training_data.groupby(['name', 'position', 'team'], as_index=False).agg({
+        'total_points': 'sum',
+        'goals_scored': 'sum',
+        'expected_goals': 'sum',
+        'minutes': 'sum',
+        'expected_assists': 'sum'
+    })
 
-    grouped_df = (
-        training_data
-        .groupby('name', as_index=False)
-        .agg({
-            'goals_scored': 'sum',
-            'expected_goals' : 'sum',
-            'expected_goal_involvements': 'sum',
-            'expected_assists' : 'sum',
-            'total_points': 'sum'
-        }))
 
-    # Figure 1: Regression Plot for Expected Goal Involvements vs Total Points
+    # Visualization 1: Expected Goals vs Actual Goals Scored (Season Totals)
+    st.subheader("Expected Goals vs Actual Goals Scored")
     fig1, ax1 = plt.subplots(figsize=(8, 6))
-    sns.regplot(data=grouped_df, x='expected_goal_involvements', y='total_points', ax=ax1)
-    ax1.set_xlabel("Expected Goal Involvements (Season Total)")
-    ax1.set_ylabel("Total Points (Season Total)")
-    ax1.set_title("Expected Goal Involvements vs Total Points (Season Totals 2023-24)")
+    sns.scatterplot(data=season_totals, x='expected_goals', y='goals_scored', hue='position', ax=ax1)
+    ax1.set_title('Expected Goals vs Actual Goals Scored (Season Totals)')
+    ax1.set_xlabel('Expected Goals (Season)')
+    ax1.set_ylabel('Actual Goals Scored (Season)')
+    ax1.legend(title='Position')
     st.pyplot(fig1)
 
-    # Figure 3: Scatter Plot for Expected Goals vs Total Points
-    fig2, ax2 = plt.subplots(figsize=(8, 6))
-    sns.scatterplot(data=grouped_df, x='expected_goals', y='total_points', ax=ax2)
-    ax2.set_xlabel("Expected Goals (Season Total)")
-    ax2.set_ylabel("Total Points (Season Total)")
-    ax2.set_title("Expected Goals vs Total Points (Season Totals 2023-24)")
+    # Visualization 2: Top 10 Players by Total Points (Season Totals)
+    st.subheader("Top 10 Players by Total Points")
+    top_players = season_totals.sort_values(by='total_points', ascending=False).head(10)
+    fig2, ax2 = plt.subplots(figsize=(10, 6))
+    sns.barplot(y=top_players['name'], x=top_players['total_points'], palette='viridis', ax=ax2)
+    ax2.set_title('Top 10 Players by Total Points (2023-24 Season Totals)')
+    ax2.set_xlabel('Total Points (Season)')
+    ax2.set_ylabel('Player')
     st.pyplot(fig2)
 
-    # Figure 2: Histogram for Expected Assists vs Total Points
-    fig3, ax3 = plt.subplots(figsize=(8,6))
-    sns.histplot(data=grouped_df, x='expected_assists', y='total_points', ax=ax3, bins=20)
-    ax3.set_xlabel("Expected Assists (Season Total)")
-    ax3.set_ylabel("Total Points (Season Total)")
-    ax3.set_title("Expected Assists vs. Total Points (Season Totals 2023-24)")
+    # Visualization 3: Minutes Played vs Total Points (Season Totals)
+    st.subheader("Minutes Played vs Total Points")
+    fig3, ax3 = plt.subplots(figsize=(8, 6))
+    sns.scatterplot(data=season_totals, x='minutes', y='total_points', hue='position', ax=ax3)
+    ax3.set_title('Minutes Played vs Total Points (Season Totals)')
+    ax3.set_xlabel('Minutes Played (Season)')
+    ax3.set_ylabel('Total Points (Season)')
+    ax3.legend(title='Position')
     st.pyplot(fig3)
 
 
 if __name__ == '__main__':
     main()
-
-
