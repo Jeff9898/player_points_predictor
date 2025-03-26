@@ -6,6 +6,15 @@ import seaborn as sns
 from predictive_model import train_and_evaluate_model, predict_next_gameweek_points
 from data_pipeline import load_all_data
 
+import datetime
+import uuid  # For anonymous session IDs
+
+# Simple logging
+with open("security.log", "a") as f:
+    session_id = str(uuid.uuid4())[:8]  # Short random ID
+    f.write(f"{datetime.datetime.now()}: Session {session_id} started\n")
+
+
 def main():
     st.title("Fantasy Premier League Dashboard")
     st.write("This prediction tool uses up-to-date player performance data to generate accurate point predictions and help FPL managers make smarter decisions each gameweek of the 2024-25 season")
@@ -73,13 +82,14 @@ def main():
         # display the table
         st.dataframe(predictions_df.head(20))  # Show top 20 players
 
+    #  ------- Visualizations --------
+
     # Visualizations Section
     st.divider()
     st.divider()
     st.subheader("Visualizations (2023-24 Season)")
     st.write("The following visuals are based on historical data from the 2023-24 Premier League season")
 
-#  ------- Visualizations --------
 
     # Group by player and sum season totals for certain metrics
     season_totals = training_data.groupby(['name', 'position', 'team'], as_index=False).agg({
